@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.quelorax</groupId>
+  <artifactId>quelorax-backend-microservices</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <name>quelorax-backend-microservices</name>
+  <description>
+    Aggregator (reactor) POM only — NOT a parent POM. Each module below keeps
+    its own independent Spring Boot parent (spring-boot-starter-parent), so
+    they stay fully standalone, deployable, and buildable on their own. This
+    file exists purely so the whole microservices folder can be imported into
+    Eclipse/IntelliJ in one action, and so `mvn clean install` from this
+    folder builds all four services in the right dependency order.
+  </description>
+
+  <modules>
+    <module>auth-service</module>
+    <module>queue-service</module>
+    <module>notification-service</module>
+    <module>api-gateway</module>
+  </modules>
+
+</project>

@@ -1,0 +1,109 @@
+# Brings up all 4 services plus a shared MySQL server together. Frontend
+# still points at http://localhost:8080 (the gateway) — nothing else
+# changes for it.
+#
+# Usage:
+#   docker compose up --build
+#
+# Each service builds from its own Dockerfile and connects to its OWN
+# database (quelorax_auth / quelorax_queue / quelorax_notify) on the shared
+# `mysql` container — same isolation as before, just persisted to disk
+# instead of resetting on every restart. The init script below creates all
+# three databases on first boot.
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: quelorax-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - quelorax_mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: quelorax_auth
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@quelorax.app}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-892918437492-nrhfmhlqk1aco4r8rm3tu5n9k541fqt2.apps.googleusercontent.com}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  queue-service:
+    build: ./queue-service
+    ports:
+      - "8082:8082"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: quelorax_queue
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      NOTIFICATION_SERVICE_URL: http://notification-service:8083
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "8083:8083"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: quelorax_notify
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      AUTH_SERVICE_URL: http://auth-service:8081
+      QUEUE_SERVICE_URL: http://queue-service:8082
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      queue-service:
+        condition: service_started
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8081
+      QUEUE_SERVICE_URL: http://queue-service:8082
+      NOTIFICATION_SERVICE_URL: http://notification-service:8083
+    depends_on:
+      - auth-service
+      - queue-service
+      - notification-service
+
+volumes:
+  quelorax_mysql_data:

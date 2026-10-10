@@ -1,0 +1,83 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # CORS is handled once, here, for the whole system — downstream
+      # services also have it configured (useful for direct/dev access) but
+      # browsers only ever talk to the gateway in normal operation.
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "http://127.0.0.1:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+      # If a downstream service's own CORS headers pass through alongside
+      # the gateway's, browsers reject the response outright (duplicate
+      # Access-Control-Allow-* headers) and it surfaces in the browser as a
+      # vague "Failed to fetch" with no clear CORS message. This keeps only
+      # one copy of each, no matter which layer added it.
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers, RETAIN_FIRST
+
+      routes:
+        # --- auth-service (8081): users, organization, settings, auth/OTP/Google ---
+        - id: auth-service-auth
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/auth/**
+        - id: auth-service-users
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/users/**
+        - id: auth-service-org
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/org/**
+        - id: auth-service-settings
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/settings/**
+
+        # --- queue-service (8082): departments, tokens, documents ---
+        - id: queue-service-departments
+          uri: ${QUEUE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/departments/**
+        - id: queue-service-tokens
+          uri: ${QUEUE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/tokens/**
+        - id: queue-service-documents
+          uri: ${QUEUE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/documents/**
+
+        # --- notification-service (8083): notifications, FCM tokens ---
+        - id: notification-service
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/notifications/**
+
+        # NOTE: "/api/internal/**" has NO route — it is intentionally
+        # unreachable through the gateway. Only other backend services can
+        # reach it, by calling auth-service (8081) / queue-service (8082)
+        # directly on their own internal ports.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,gateway

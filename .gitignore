@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Build artifacts
+dist/
+build/
+target/
+**/target/
+*.jar
+*.war
+*.ear
+*.class
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# IDE and OS
+.idea/
+*.iml
+.vscode/
+.settings/
+**/.settings/
+.project
+**/.project
+.classpath
+**/.classpath
+.DS_Store
+Thumbs.db
+*.swp
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Secrets and Credentials
+*service-account*.json
+firebase-service-account.json
+*.pem
+*.key
+*.p12

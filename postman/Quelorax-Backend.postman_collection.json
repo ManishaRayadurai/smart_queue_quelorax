@@ -1,0 +1,1129 @@
+{
+  "info": {
+    "name": "Quelorax Backend API",
+    "description": "Backend REST API for the Quelorax Queue Management System (Spring Boot). Import the accompanying environment too, then run 'Login (Admin)' first to auto-capture a JWT into {{token}}.\n\nQuelorax Backend API \u2014 routed through the api-gateway (http://localhost:8080), which now sits in front of 4 independent microservices: auth-service (:8081), queue-service (:8082), notification-service (:8083). Every request in this collection still targets {{base_url}} = the gateway, exactly as before \u2014 nothing here needs to change to work against the new architecture. See README-MICROSERVICES.md in the backend folder for details, and the 'Direct-to-service (advanced/debug)' folder below if you ever want to bypass the gateway and hit a service directly.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "departmentId",
+      "value": ""
+    },
+    {
+      "key": "tokenId",
+      "value": ""
+    },
+    {
+      "key": "otp",
+      "value": ""
+    },
+    {
+      "key": "google_id_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "AI & Machine Learning",
+      "item": [
+        {
+          "name": "Predict Wait Time (AI Model)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "http://localhost:8084/api/ai/predict-wait-time",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departmentId\": 1,\n  \"priority\": \"normal\",\n  \"queuePosition\": 4\n}"
+            },
+            "description": "Uses trained Random Forest / XGBoost model (trained on 5,000 MySQL records) to predict exact wait time in minutes."
+          }
+        },
+        {
+          "name": "Crowd Density Forecast (AI Model)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8084/api/ai/crowd-forecast",
+            "description": "Forecasts crowd level (low/medium/high) and recommended counter staffing allocation for all departments."
+          }
+        },
+        {
+          "name": "AI Service Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "http://localhost:8084/api/ai/health",
+            "description": "Checks status of Python AI microservice and loaded model binaries."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Visitor\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+919999999999\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// OTP is no longer returned in the response \u2014 it's emailed/texted for real now.",
+                  "// Check your inbox/phone and paste the code into the {{otp}} collection variable, or into the request body directly, before running the next request."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/verify-registration",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"{{otp}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.token) { pm.collectionVariables.set('token', data.token); }",
+                  "if (data.user) { pm.collectionVariables.set('userId', data.user.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend Registration OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/resend-registration-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test.visitor@example.com\"\n}"
+            },
+            "description": "Sends a fresh OTP for a registration that hasn't been verified yet. Returns 404 if there's no pending registration for that email, or 409 if it's already verified."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Resend accepted', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@quelorax.app\",\n  \"password\": \"admin123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.token) { pm.collectionVariables.set('token', data.token); }",
+                  "if (data.user) { pm.collectionVariables.set('userId', data.user.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Receptionist)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"reception@quelorax.app\",\n  \"password\": \"reception123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login (Staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff@quelorax.app\",\n  \"password\": \"staff123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Request Login OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/login-otp/request",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// OTP is no longer returned in the response \u2014 it's emailed/texted for real now.",
+                  "// Check your inbox/phone and paste the code into the {{otp}} collection variable, or into the request body directly, before running the next request."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Login OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/login-otp/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"{{otp}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Google Sign-In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/google",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"{{google_id_token}}\"\n}"
+            },
+            "description": "Body must contain a real Google ID token (JWT) from Google Identity Services on the frontend \u2014 Postman cannot mint one itself. Open the frontend, sign in with Google, and copy the `credential` value it sends to /api/auth/google (e.g. via browser devtools Network tab) into the `google_id_token` collection variable. First-time sign-in auto-creates a verified VISITOR account; existing users are logged in."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.token) { pm.collectionVariables.set('token', data.token); }",
+                  "if (data.user) { pm.collectionVariables.set('userId', data.user.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// OTP is no longer returned in the response \u2014 it's emailed/texted for real now.",
+                  "// Check your inbox/phone and paste the code into the {{otp}} collection variable, or into the request body directly, before running the next request."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"{{otp}}\",\n  \"newPassword\": \"newpassword123\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/users/me"
+          }
+        },
+        {
+          "name": "Get All Users (Admin/Receptionist)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/users"
+          }
+        },
+        {
+          "name": "Get User By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/users/{{userId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated\",\n  \"phone\": \"+911111111111\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Login Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/users/stats/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "Get All Departments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/departments"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (Array.isArray(data) && data.length) { pm.collectionVariables.set('departmentId', data[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Department By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/departments/{{departmentId}}"
+          }
+        },
+        {
+          "name": "Create Department (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/departments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"HR Services\",\n  \"code\": \"HR\",\n  \"avgServiceTime\": 7,\n  \"counter\": 4,\n  \"active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Department (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/departments/{{departmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"General Enquiry\",\n  \"code\": \"GEN\",\n  \"avgServiceTime\": 6,\n  \"counter\": 1,\n  \"active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Department (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/departments/{{departmentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Queue Tokens",
+      "item": [
+        {
+          "name": "Book Token (Create)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"visitorName\": \"John Visitor\",\n  \"phone\": \"+919999999999\",\n  \"departmentId\": {{departmentId}},\n  \"purpose\": \"Document submission\",\n  \"walkIn\": false,\n  \"slotTime\": null,\n  \"priority\": \"normal\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('tokenId', data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Book Token (Scheduled Date + Time)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"visitorName\": \"John Visitor\",\n  \"phone\": \"+919999999999\",\n  \"departmentId\": {{departmentId}},\n  \"purpose\": \"Document submission\",\n  \"walkIn\": false,\n  \"slotTime\": 4102444800000,\n  \"priority\": \"normal\"\n}"
+            },
+            "description": "Books a token for a future scheduled date/time. `slotTime` is epoch milliseconds combining the visitor's chosen DATE and TIME (see the frontend date+time picker on the Book Token page). The example value above is a placeholder future timestamp - replace it with a real future epoch-ms value, e.g. from `Date.now() + N days`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "pm.test('Booking accepted for future slot', function () { pm.response.to.have.status(200); });",
+                  "if (data.id) { pm.collectionVariables.set('tokenId', data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Book Token (Past Date/Time - Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"visitorName\": \"John Visitor\",\n  \"phone\": \"+919999999999\",\n  \"departmentId\": {{departmentId}},\n  \"purpose\": \"Document submission\",\n  \"walkIn\": false,\n  \"slotTime\": 946684800000,\n  \"priority\": \"normal\"\n}"
+            },
+            "description": "Demonstrates time-based booking enforcement: `slotTime` here is a timestamp far in the past (2000-01-01), so the backend rejects the booking with 400 Bad Request and the message \"This date/time has already passed. Please choose a future date and time.\""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Past slot is rejected with 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Tokens",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens"
+          }
+        },
+        {
+          "name": "Get Token By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}"
+          }
+        },
+        {
+          "name": "Get Tokens By Department",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/department/{{departmentId}}"
+          }
+        },
+        {
+          "name": "Get Tokens By User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/user/{{userId}}"
+          }
+        },
+        {
+          "name": "Get Waiting Queue (Department)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/department/{{departmentId}}/waiting"
+          }
+        },
+        {
+          "name": "Get Delayed Queue (Department)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/department/{{departmentId}}/delayed"
+          }
+        },
+        {
+          "name": "Get Missed Queue (Department)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/department/{{departmentId}}/missed"
+          }
+        },
+        {
+          "name": "Get Active Tokens For User In Dept",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/active?userId={{userId}}&departmentId={{departmentId}}"
+          }
+        },
+        {
+          "name": "Update Token (generic patch)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purpose\": \"Updated purpose\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Cancel Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/cancel"
+          }
+        },
+        {
+          "name": "Check In Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/checkin"
+          }
+        },
+        {
+          "name": "Delay Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/delay",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"minutes\": 30\n}"
+            }
+          }
+        },
+        {
+          "name": "Set Token Priority",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/priority",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": \"vip\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reorder Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/reorder",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"direction\": \"up\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Flag Overdue Delays (Department)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/department/{{departmentId}}/flag-overdue"
+          }
+        },
+        {
+          "name": "Call Next (Staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/call"
+          }
+        },
+        {
+          "name": "Complete Token (Staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/complete"
+          }
+        },
+        {
+          "name": "Skip Token (Staff)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/tokens/{{tokenId}}/skip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Get Documents By User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/documents/user/{{userId}}"
+          }
+        },
+        {
+          "name": "Create Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/documents",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"name\": \"Aadhar Card\",\n  \"type\": \"identity\",\n  \"fileUrl\": \"https://example.com/files/aadhar.pdf\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/documents/1",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/documents/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications For User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/notifications?userId={{userId}}&role=visitor&departmentId={{departmentId}}"
+          }
+        },
+        {
+          "name": "Create Notification (Broadcast)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/notifications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scope\": \"org\",\n  \"type\": \"info\",\n  \"title\": \"Office closed tomorrow\",\n  \"message\": \"The office will remain closed tomorrow for a public holiday.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/notifications/1/read?userId={{userId}}"
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/notifications/read-all",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"role\": \"visitor\",\n  \"departmentId\": {{departmentId}}\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organization",
+      "item": [
+        {
+          "name": "Get Organization",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/org"
+          }
+        },
+        {
+          "name": "Update Organization (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/org",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Quelorax Organization\",\n  \"tagline\": \"Any walk-in organization, upgraded\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/settings"
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/settings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": \"dark\",\n  \"language\": \"en\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
